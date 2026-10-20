@@ -138,7 +138,8 @@ const main = async (): Promise<void> => {
         "-products",
         "*",
         "-find",
-        `VC/Redist/MSVC/**/${process.arch}/Microsoft.VC*.CRT/msvcp140.dll`,
+        // 只匹配桌面版 CRT，递归通配会先选中 onecore 子目录
+        `VC/Redist/MSVC/*/${process.arch}/Microsoft.VC*.CRT/msvcp140.dll`,
       ],
       { encoding: "utf8" },
     )
