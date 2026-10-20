@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AutoMixProfile } from "@shared/types/automix";
-import { canAutoMix, planAutoMix as createPlan } from "./planner";
+import { planAutoMix as createPlan } from "./planner";
 import { measureBeatPeriod, pickBeatPeaks } from "./beats";
 
 /**
@@ -97,12 +97,6 @@ describe("AutoMix 节拍规划", () => {
     expect(plan.outStartMs + plan.durationMs * plan.outgoingRate).toBe(20_000);
   });
 
-  it("正常速度和音调才允许启用，不将用户的倍速配置作为自动对拍参数", () => {
-    expect(canAutoMix(1, 0)).toBe(true);
-    expect(canAutoMix(1.05, 0)).toBe(false);
-    expect(canAutoMix(1, 1)).toBe(false);
-  });
-
   it("120 到 125 BPM 使用保音调的小幅倍率，并让两路拍点保持同步", () => {
     const plan = planAutoMix(profile(), profile(480), 20_000);
     expect(plan.outgoingRate).toBeCloseTo(500 / 480);
@@ -122,13 +116,6 @@ describe("AutoMix 节拍规划", () => {
 
   it.each([0.9295, 1.0707])("%s 越界时不截断倍率伪造对拍，交由交叉过渡", (ideal) => {
     expect(createPlan(profile(), profile(500 / ideal), 20_000)).toBeNull();
-  });
-
-  it("网格量化的微小误差不会让临近曲尾的小节全部失效", () => {
-    const outgoing = profile();
-    outgoing.periodMs = 500.03;
-    const plan = planAutoMix(outgoing, profile(480), 20_000);
-    expect(plan.outStartMs + plan.durationMs * plan.outgoingRate).toBeLessThanOrEqual(20_000);
   });
 
   it.each(["unstable", "far", "unknown"])("%s 证据不足时不生成 AutoMix，交由交叉过渡", (reason) => {

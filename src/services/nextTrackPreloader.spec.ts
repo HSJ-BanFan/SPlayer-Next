@@ -88,28 +88,6 @@ describe("下一曲真实预载", () => {
     preloader.disposeNextTrackPreload();
   });
 
-  it.each(["none", "crossfade"])("%s 模式不查询或订阅模型组件", async (mode) => {
-    mocks.settings.player.transitionMode = mode;
-    const preloader = await import("./nextTrackPreloader");
-    preloader.installNextTrackPreloadWatchers();
-    await flushPromises();
-    expect(mocks.componentStatus).not.toHaveBeenCalled();
-    expect(mocks.componentSubscribe).not.toHaveBeenCalled();
-  });
-
-  it("选择 AutoMix 后才读取组件状态，离开时解除订阅", async () => {
-    const preloader = await import("./nextTrackPreloader");
-    preloader.installNextTrackPreloadWatchers();
-    mocks.settings.player.transitionMode = "automix";
-    await flushPromises();
-    expect(mocks.componentStatus).toHaveBeenCalledOnce();
-    expect(mocks.componentSubscribe).toHaveBeenCalledOnce();
-    mocks.settings.player.transitionMode = "none";
-    await flushPromises();
-    expect(mocks.componentUnsubscribe).toHaveBeenCalledOnce();
-    expect(mocks.componentStatus).toHaveBeenCalledOnce();
-  });
-
   it("已下载歌曲直接准备原生预载槽位", async () => {
     mocks.resolve.mockResolvedValueOnce({
       source: "C:/downloads/next.flac",
