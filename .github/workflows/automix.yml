@@ -105,6 +105,7 @@ jobs:
       - name: 构建运行包并校验两个模型的实际推理
         run: pnpm exec tsx scripts/package-automix-runtime.ts node_modules/.cache/automix-runtime models
       - uses: actions/upload-artifact@v6
+        if: ${{ !cancelled() }}
         with:
           name: automix-${{ runner.os }}-${{ matrix.arch }}
           compression-level: 0
