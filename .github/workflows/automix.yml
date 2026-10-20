@@ -5,7 +5,6 @@ on:
     branches:
       - feat/automix
     paths:
-      - .github/workflows/automix.yml
       - native/automix-worker/**
       - scripts/export-automix-model.py
       - scripts/package-automix-runtime.ts
@@ -18,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       release_run_id:
-        description: 从已验证的运行编号创建草稿 Release，留空仅构建
+        description: 上传到已有 AutoMix 草稿的构建编号，留空仅构建
         type: string
         default: ""
 
@@ -142,27 +141,20 @@ jobs:
       actions: read
       contents: write
     steps:
-      - uses: actions/checkout@v6
-      - name: 读取组件的构建提交
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUN_ID: ${{ inputs.release_run_id }}
-        run: |
-          source_sha="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq .head_sha)"
-          echo "SOURCE_SHA=$source_sha" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@v7
         with:
           name: automix-release
           path: release-assets
           run-id: ${{ inputs.release_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: 创建草稿 Release 并上传全部组件
+      # 功能分支含未合并的工作流时，GITHUB_TOKEN 只能上传附件，草稿由维护者创建
+      - name: 上传组件到 AutoMix 草稿
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create AutoMix release-assets/*.zip release-assets/*.json \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$SOURCE_SHA" \
-            --title "Auto Mix" \
-            --notes "AutoMix 独立组件：两份共用 FP32 模型及 Windows、macOS、Linux 的 x64 / ARM64 运行包，来源与校验信息见附件。" \
-            --draft --latest=false
+          if [ "$(gh release view AutoMix --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" != true ]; then
+            echo "请先在仓库中创建标签为 AutoMix 的草稿 Release"
+            exit 1
+          fi
+          gh release upload AutoMix release-assets/*.zip release-assets/*.json \
+            --repo "$GITHUB_REPOSITORY" --clobber

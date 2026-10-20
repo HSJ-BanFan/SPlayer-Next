@@ -4,7 +4,7 @@ import type { AutoMixComponentId } from "@shared/types/automix";
 let components: typeof import("@main/services/automix/components") | undefined;
 
 /**
- * 用户访问组件时才载入校验与解压服务，普通启动不加载压缩库
+ * 用户访问组件时才载入下载与解压服务，普通启动不加载压缩库
  * @returns 当前进程复用的组件服务
  */
 const getComponents = async (): Promise<typeof import("@main/services/automix/components")> =>
