@@ -7,7 +7,7 @@ import { toast } from "@/composables/useToast";
 defineOptions({ inheritAttrs: false });
 const { t } = useI18n();
 const open = ref(false);
-const pending = ref<{ id: AutoMixComponentId; action: "download" | "import" } | null>(null);
+const pending = ref<AutoMixComponentId | null>(null);
 const status = autoMixComponentStatus;
 const busy = computed(() => pending.value !== null || status.value.state === "downloading");
 const models = computed(() =>
@@ -26,22 +26,16 @@ const handleOpen = (): void => {
 };
 
 /**
- * 安装指定组件，下载和导入均校验兼容版本
+ * 下载并安装指定组件
  * @param id - 组件标识
- * @param action - 下载或本地文件导入
  */
-const install = async (id: AutoMixComponentId, action: "download" | "import"): Promise<void> => {
-  pending.value = { id, action };
+const install = async (id: AutoMixComponentId): Promise<void> => {
+  pending.value = id;
   try {
-    const result =
-      action === "import"
-        ? await window.api.automix.importFiles(id)
-        : await window.api.automix.download(id);
-    if (result) {
-      status.value = result;
-      const error = result.models.find((item) => item.id === id)?.error;
-      if (error) toast.error(error);
-    }
+    const result = await window.api.automix.download(id);
+    status.value = result;
+    const error = result.models.find((item) => item.id === id)?.error;
+    if (error) toast.error(error);
   } catch (error) {
     toast.error(error instanceof Error ? error.message : String(error));
   } finally {
@@ -49,7 +43,7 @@ const install = async (id: AutoMixComponentId, action: "download" | "import"): P
   }
 };
 
-/** 取消安装，保留已完成文件和下载分块 */
+/** 取消当前组件的下载或解压 */
 const cancel = async (): Promise<void> => {
   try {
     await window.api.automix.cancelDownload();
@@ -71,7 +65,7 @@ const cancel = async (): Promise<void> => {
         "
         class="text-xs text-on-surface-variant/70"
       >
-        {{ t("settings.automixComponents.localOnly") }}
+        {{ t("settings.automixComponents.unpublished") }}
       </p>
       <SCard v-for="model in models" :key="model.id" variant="settings">
         <div class="flex flex-wrap items-center gap-3">
@@ -113,30 +107,15 @@ const cancel = async (): Promise<void> => {
                 model.state === 'ready' ||
                 model.state === 'unsupported'
               "
-              :loading="pending?.id === model.id && pending.action === 'download'"
-              @click="install(model.id, 'download')"
+              :loading="pending === model.id"
+              @click="install(model.id)"
             >
               {{ t("settings.automixComponents.download") }}
-            </SButton>
-            <SButton
-              variant="secondary"
-              size="small"
-              :disabled="busy || !model.state || model.state === 'unsupported'"
-              :loading="pending?.id === model.id && pending.action === 'import'"
-              @click="install(model.id, 'import')"
-            >
-              {{ t("settings.automixComponents.import") }}
             </SButton>
           </div>
         </div>
         <p v-if="model.error" role="alert" class="mt-2 break-words text-xs text-error">
           {{ model.error }}
-        </p>
-        <p
-          v-else-if="model.state === 'missing' && model.received"
-          class="mt-2 text-xs text-on-surface-variant/70"
-        >
-          {{ t("settings.automixComponents.incomplete") }}
         </p>
       </SCard>
     </div>

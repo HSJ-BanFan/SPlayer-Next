@@ -905,11 +905,9 @@
       "download": "下载",
       "ready": "已安装",
       "unsupported": "暂不支持",
-      "import": "导入文件",
-      "incomplete": "已导入部分文件，可继续导入或下载补齐",
       "missing": "未安装",
       "error": "安装失败",
-      "localOnly": "组件包暂未发布，请导入本地包"
+      "unpublished": "组件包暂未发布"
     },
     "transitionPreference": {
       "label": "交接倾向",

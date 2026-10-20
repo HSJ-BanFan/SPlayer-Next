@@ -87,7 +87,7 @@ export interface AutoMixPrepareOptions {
 /** 分析组件管理接口，不会在查询状态时自动下载 */
 export interface AutoMixApi {
   /**
-   * 查询磁盘组件的校验状态
+   * 查询组件文件的安装状态
    * @returns 模型和运行时的安装状态
    */
   getStatus(): Promise<AutoMixComponentStatus>;
@@ -97,12 +97,6 @@ export interface AutoMixApi {
    * @returns 安装完成后的组件状态
    */
   download(id: AutoMixComponentId): Promise<AutoMixComponentStatus>;
-  /**
-   * 通过文件选择器导入并校验兼容文件
-   * @param id - 组件标识
-   * @returns 安装状态，取消选择时为空
-   */
-  importFiles(id: AutoMixComponentId): Promise<AutoMixComponentStatus | null>;
   /** 取消当前下载 */
   cancelDownload(): Promise<void>;
   /** 订阅状态，返回解绑函数 */

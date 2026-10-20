@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - feat/automix
-    tags:
-      - AutoMix
     paths:
       - .github/workflows/automix.yml
       - native/automix-worker/**
@@ -19,10 +17,10 @@ on:
       - pnpm-lock.yaml
   workflow_dispatch:
     inputs:
-      create_release:
-        description: 创建 AutoMix 草稿 Release
-        type: boolean
-        default: false
+      release_run_id:
+        description: 从已验证的运行编号创建草稿 Release，留空仅构建
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -33,6 +31,7 @@ concurrency:
 
 jobs:
   models:
+    if: inputs.release_run_id == ''
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -118,8 +117,6 @@ jobs:
   release:
     needs: [models, runtime]
     runs-on: ubuntu-24.04
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v6
       - uses: actions/download-artifact@v7
@@ -131,27 +128,41 @@ jobs:
         working-directory: release-assets
         run: |
           test "$(find . -maxdepth 1 -name 'automix-*.zip' | wc -l)" -eq 8
-          sha256sum automix-*.zip > SHA256SUMS.txt
-          cat SHA256SUMS.txt >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v6
         with:
           name: automix-release
           compression-level: 0
           path: release-assets/*
           if-no-files-found: error
+
+  publish:
+    if: inputs.release_run_id != ''
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: 读取组件的构建提交
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ inputs.release_run_id }}
+        run: |
+          source_sha="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq .head_sha)"
+          echo "SOURCE_SHA=$source_sha" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v7
+        with:
+          name: automix-release
+          path: release-assets
+          run-id: ${{ inputs.release_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: 创建草稿 Release 并上传全部组件
-        if: inputs.create_release || github.ref == 'refs/tags/AutoMix'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          tag_commit="$(git ls-remote --tags origin refs/tags/AutoMix 'refs/tags/AutoMix^{}' | tail -n 1 | cut -f 1)"
-          if [ -n "$tag_commit" ] && [ "$tag_commit" != "$GITHUB_SHA" ]; then
-            echo "AutoMix 标签与本次构建的提交不一致"
-            exit 1
-          fi
-          gh release create AutoMix release-assets/* \
+          gh release create AutoMix release-assets/*.zip release-assets/*.json \
             --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
+            --target "$SOURCE_SHA" \
             --title "Auto Mix" \
             --notes "AutoMix 独立组件：两份共用 FP32 模型及 Windows、macOS、Linux 的 x64 / ARM64 运行包，来源与校验信息见附件。" \
             --draft --latest=false

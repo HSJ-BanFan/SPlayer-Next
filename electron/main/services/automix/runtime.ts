@@ -1,51 +1,12 @@
 import { createWriteStream } from "node:fs";
-import { chmod, mkdir, readFile } from "node:fs/promises";
+import { chmod, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { open } from "yauzl";
-import { z } from "zod";
-import { AUTOMIX_RUNTIME_FILES, AUTOMIX_RUNTIME_VERSION } from "./assets";
-
-const manifestSchema = z.object({
-  version: z.literal(AUTOMIX_RUNTIME_VERSION),
-  platform: z.literal(process.platform),
-  arch: z.literal(process.arch),
-  contents: z
-    .array(
-      z.object({
-        file: z.string(),
-        bytes: z
-          .number()
-          .int()
-          .positive()
-          .max(100 * 1024 * 1024),
-        sha256: z.string().regex(/^[a-f0-9]{64}$/),
-      }),
-    )
-    .length(AUTOMIX_RUNTIME_FILES.length),
-});
 
 /**
- * 读取本机运行包清单，拒绝旧解释器、其他系统或缺失文件的构建
- * @param directory - 已解压的运行包目录
- * @returns 当前协议对应的二进制校验信息
- */
-export const readAutoMixRuntime = async (directory: string) => {
-  const manifest = manifestSchema.parse(
-    JSON.parse(await readFile(path.join(directory, "manifest.json"), "utf8")),
-  );
-  if (
-    AUTOMIX_RUNTIME_FILES.some(
-      (file) => manifest.contents.filter((item) => item.file === file).length !== 1,
-    )
-  )
-    throw new Error("运行包文件与当前平台不匹配");
-  return manifest.contents;
-};
-
-/**
- * 逐文件解压已通过摘要核验的独立环境，限制路径、文件类型和总大小
- * @param archive - 已核验的 ZIP 文件
+ * 逐文件解压组件，限制路径、文件类型和总大小
+ * @param archive - 下载完成的 ZIP 文件
  * @param destination - 新建的安装暂存目录
  * @param signal - 用户取消信号
  */
@@ -90,9 +51,9 @@ export const extractAutoMixPackage = async (
           (mode & 0o170000) === 0o120000 ||
           entry.fileName.includes("\\")
         )
-          throw new Error("运行时压缩包含无效路径");
+          throw new Error("组件压缩包含无效路径");
         extracted += entry.uncompressedSize;
-        if (extracted > 600 * 1024 * 1024) throw new Error("运行时解压大小超出限制");
+        if (extracted > 600 * 1024 * 1024) throw new Error("组件解压大小超出限制");
         if (entry.fileName.endsWith("/")) await mkdir(target, { recursive: true });
         else {
           await mkdir(path.dirname(target), { recursive: true });

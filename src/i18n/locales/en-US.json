@@ -905,11 +905,9 @@
       "download": "Download",
       "ready": "Installed",
       "unsupported": "Unavailable",
-      "import": "Import files",
-      "incomplete": "Some files are installed. Import or download the remaining dependencies",
       "missing": "Not installed",
       "error": "Installation failed",
-      "localOnly": "Components are not published yet. Import local packages."
+      "unpublished": "Components are not published yet"
     },
     "transitionPreference": {
       "label": "Handoff preference",

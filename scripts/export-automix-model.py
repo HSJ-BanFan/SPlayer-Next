@@ -86,7 +86,7 @@ def model_inputs(kind):
 
 
 def main():
-    """核验官方权重，导出原精度图、执行校验向量和可独立导入的组件包"""
+    """核验官方权重，导出原精度图、校验向量和独立下载的组件包"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("kind", choices=SOURCES)
     parser.add_argument("checkpoint", type=pathlib.Path)

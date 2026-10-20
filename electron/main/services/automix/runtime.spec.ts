@@ -1,8 +1,7 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { extractAutoMixPackage, readAutoMixRuntime } from "./runtime";
-import { AUTOMIX_RUNTIME_FILES, AUTOMIX_RUNTIME_VERSION } from "./assets";
+import { extractAutoMixPackage } from "./runtime";
 
 const root = path.resolve("node_modules/.cache/automix-zip-test");
 
@@ -47,27 +46,6 @@ afterEach(async () => {
 });
 
 describe("AutoMix 独立环境解压", () => {
-  it("仅接受当前系统与 Rust 协议，拒绝缺文件和重复文件的清单", async () => {
-    await mkdir(root, { recursive: true });
-    const manifest = {
-      version: AUTOMIX_RUNTIME_VERSION,
-      platform: process.platform,
-      arch: process.arch,
-      contents: AUTOMIX_RUNTIME_FILES.map((file) => ({ file, bytes: 3, sha256: "a".repeat(64) })),
-    };
-    await writeFile(path.join(root, "manifest.json"), JSON.stringify(manifest));
-    expect(await readAutoMixRuntime(root)).toEqual(manifest.contents);
-    for (const invalid of [
-      { ...manifest, version: "python-v2" },
-      { ...manifest, platform: "other" },
-      { ...manifest, arch: "other" },
-      { ...manifest, contents: manifest.contents.slice(1) },
-      { ...manifest, contents: manifest.contents.map(() => manifest.contents[0]) },
-    ]) {
-      await writeFile(path.join(root, "manifest.json"), JSON.stringify(invalid));
-      await expect(readAutoMixRuntime(root)).rejects.toThrow();
-    }
-  });
   it("逐文件解压到指定目录", async () => {
     await mkdir(root, { recursive: true });
     const archive = path.join(root, "runtime.zip");

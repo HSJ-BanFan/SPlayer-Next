@@ -81,13 +81,6 @@ const api = {
      */
     download: (id: AutoMixComponentId): Promise<AutoMixComponentStatus> =>
       ipcRenderer.invoke("automix:download", id),
-    /**
-     * 通过主进程文件选择器导入并核验兼容模型
-     * @param id - 组件标识
-     * @returns 安装结果，取消选择时为空
-     */
-    importFiles: (id: AutoMixComponentId): Promise<AutoMixComponentStatus | null> =>
-      ipcRenderer.invoke("automix:importFiles", id),
     /** 取消本次下载 */
     cancelDownload: (): Promise<void> => ipcRenderer.invoke("automix:cancelDownload"),
     /**

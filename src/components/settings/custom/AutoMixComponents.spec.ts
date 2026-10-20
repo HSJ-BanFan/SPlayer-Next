@@ -8,7 +8,6 @@ import AutoMixComponents from "./AutoMixComponents.vue";
 const mocks = vi.hoisted(() => ({
   getStatus: vi.fn(),
   download: vi.fn(),
-  importFiles: vi.fn(),
   error: vi.fn(),
 }));
 vi.mock("@/composables/useToast", () => ({ toast: { error: mocks.error } }));
@@ -55,22 +54,18 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("AutoMix 模型管理", () => {
-  it("未发布组件禁用下载并保留本地导入", async () => {
-    const localOnly = structuredClone(missing);
-    localOnly.models.forEach((model) => (model.downloadAvailable = false));
-    mocks.getStatus.mockResolvedValue(localOnly);
-    mocks.importFiles.mockResolvedValue(null);
+  it("未发布组件只显示禁用的下载按钮", async () => {
+    const unpublished = structuredClone(missing);
+    unpublished.models.forEach((model) => (model.downloadAvailable = false));
+    mocks.getStatus.mockResolvedValue(unpublished);
     const wrapper = mountDialog();
     await wrapper.get("button").trigger("click");
     await flushPromises();
-    expect(wrapper.text()).toContain("settings.automixComponents.localOnly");
+    expect(wrapper.text()).toContain("settings.automixComponents.unpublished");
     for (const row of wrapper.findAll("article")) {
-      expect(row.findAll("button")[0].element.disabled).toBe(true);
-      expect(row.findAll("button")[1].element.disabled).toBe(false);
+      expect(row.findAll("button")).toHaveLength(1);
+      expect(row.get("button").element.disabled).toBe(true);
     }
-    await wrapper.findAll("article")[0].findAll("button")[1].trigger("click");
-    await flushPromises();
-    expect(mocks.importFiles).toHaveBeenCalledExactlyOnceWith("beat");
     expect(mocks.download).not.toHaveBeenCalled();
     wrapper.unmount();
   });
@@ -95,24 +90,6 @@ describe("AutoMix 模型管理", () => {
     await flushPromises();
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true);
     expect(mocks.error).toHaveBeenCalledWith("磁盘读取失败");
-    expect(autoMixComponentStatus.value).toEqual(missing);
-    wrapper.unmount();
-  });
-
-  it("每行操作只传对应组件标识，取消导入不改变已有状态", async () => {
-    mocks.getStatus.mockResolvedValue(missing);
-    mocks.download.mockResolvedValue(missing);
-    mocks.importFiles.mockResolvedValue(null);
-    const wrapper = mountDialog();
-    await wrapper.get("button").trigger("click");
-    await flushPromises();
-    const rows = wrapper.findAll("article");
-    await rows[1].findAll("button")[0].trigger("click");
-    await flushPromises();
-    expect(mocks.download).toHaveBeenCalledExactlyOnceWith("demucs");
-    await rows[2].findAll("button")[1].trigger("click");
-    await flushPromises();
-    expect(mocks.importFiles).toHaveBeenCalledExactlyOnceWith("runtime");
     expect(autoMixComponentStatus.value).toEqual(missing);
     wrapper.unmount();
   });

@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain } from "electron";
+import { app, ipcMain } from "electron";
 import type { AutoMixComponentId } from "@shared/types/automix";
 
 let components: typeof import("@main/services/automix/components") | undefined;
@@ -18,22 +18,6 @@ export const registerAutoMixIpc = (): void => {
   ipcMain.handle("automix:download", async (_event, id: AutoMixComponentId) =>
     (await getComponents()).installAutoMixComponents(id),
   );
-  ipcMain.handle("automix:importFiles", async (_event, id: AutoMixComponentId) => {
-    if (id !== "beat" && id !== "demucs" && id !== "runtime")
-      throw new Error("不支持的 AutoMix 组件");
-    const result = await dialog.showOpenDialog({
-      title: "AutoMix",
-      properties: ["openFile"],
-      filters: [
-        {
-          name: "AutoMix",
-          extensions: ["zip"],
-        },
-      ],
-    });
-    if (result.canceled || !result.filePaths.length) return null;
-    return (await getComponents()).installAutoMixComponents(id, result.filePaths[0]);
-  });
   ipcMain.handle("automix:cancelDownload", () => components?.cancelAutoMixDownload());
   app.on("before-quit", () => components?.cancelAutoMixDownload());
 };
