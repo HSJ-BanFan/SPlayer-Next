@@ -2,8 +2,21 @@ name: AutoMix components
 
 on:
   push:
+    branches:
+      - feat/automix
     tags:
       - AutoMix
+    paths:
+      - .github/workflows/automix.yml
+      - native/automix-worker/**
+      - scripts/export-automix-model.py
+      - scripts/package-automix-runtime.ts
+      - electron/main/services/automix/assets.ts
+      - electron/main/services/automix/runtime.ts
+      - Cargo.toml
+      - Cargo.lock
+      - package.json
+      - pnpm-lock.yaml
   workflow_dispatch:
     inputs:
       create_release:
