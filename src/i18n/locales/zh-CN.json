@@ -906,8 +906,7 @@
       "ready": "已安装",
       "unsupported": "暂不支持",
       "missing": "未安装",
-      "error": "安装失败",
-      "unpublished": "组件包暂未发布"
+      "error": "安装失败"
     },
     "transitionPreference": {
       "label": "交接倾向",

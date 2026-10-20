@@ -174,8 +174,8 @@ describe("下一曲真实预载", () => {
     service.autoMixComponentStatus.value = {
       state: "missing",
       models: [
-        { id: "beat", state: "ready", received: 1, total: 1, downloadAvailable: true },
-        { id: "runtime", state: "ready", received: 1, total: 1, downloadAvailable: true },
+        { id: "beat", state: "ready", received: 1, total: 1 },
+        { id: "runtime", state: "ready", received: 1, total: 1 },
       ],
     };
     const preloader = await import("./nextTrackPreloader");
@@ -185,14 +185,13 @@ describe("下一曲真实预载", () => {
       service.autoMixComponentStatus.value = {
         state: received === 99 ? "ready" : "downloading",
         models: [
-          { id: "beat", state: "ready", received: 1, total: 1, downloadAvailable: true },
-          { id: "runtime", state: "ready", received: 1, total: 1, downloadAvailable: true },
+          { id: "beat", state: "ready", received: 1, total: 1 },
+          { id: "runtime", state: "ready", received: 1, total: 1 },
           {
             id: "demucs",
             state: received === 99 ? "ready" : "downloading",
             received,
             total: 99,
-            downloadAvailable: true,
           },
         ],
       };

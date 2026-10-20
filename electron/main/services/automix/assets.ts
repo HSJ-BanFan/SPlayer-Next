@@ -4,13 +4,11 @@ import { release } from "node:os";
 /** 独立组件的下载地址与所需文件 */
 interface AutoMixAsset {
   file: string;
-  url: string | null;
+  url: string;
   files: readonly string[];
 }
 
 export const AUTOMIX_RUNTIME_VERSION = "rust-1";
-// 组件公开发布后启用下载
-export const AUTOMIX_DOWNLOAD_AVAILABLE = false;
 const baseUrl = "https://github.com/SPlayer-Dev/SPlayer-Next/releases/download/AutoMix";
 const [osMajor, osMinor] = release().split(".").map(Number);
 const supportedMac =
@@ -38,12 +36,12 @@ export const AUTOMIX_RUNTIME_FILES = [
 export const AUTOMIX_COMPONENTS: Record<AutoMixComponentId, AutoMixAsset | null> = {
   beat: {
     file: "automix-beat-v2.zip",
-    url: AUTOMIX_DOWNLOAD_AVAILABLE ? `${baseUrl}/automix-beat-v2.zip` : null,
+    url: `${baseUrl}/automix-beat-v2.zip`,
     files: ["beat-this.onnx", "beat-this.check.json"],
   },
   demucs: {
     file: "automix-demucs-v2.zip",
-    url: AUTOMIX_DOWNLOAD_AVAILABLE ? `${baseUrl}/automix-demucs-v2.zip` : null,
+    url: `${baseUrl}/automix-demucs-v2.zip`,
     files: ["htdemucs.onnx", "htdemucs.check.json"],
   },
   runtime:
@@ -52,9 +50,7 @@ export const AUTOMIX_COMPONENTS: Record<AutoMixComponentId, AutoMixAsset | null>
     ["x64", "arm64"].includes(process.arch)
       ? {
           file: `automix-runtime-${process.platform}-${process.arch}.zip`,
-          url: AUTOMIX_DOWNLOAD_AVAILABLE
-            ? `${baseUrl}/automix-runtime-${process.platform}-${process.arch}.zip`
-            : null,
+          url: `${baseUrl}/automix-runtime-${process.platform}-${process.arch}.zip`,
           files: AUTOMIX_RUNTIME_FILES,
         }
       : null,

@@ -59,14 +59,6 @@ const cancel = async (): Promise<void> => {
   </SButton>
   <SDialog v-model:open="open" :title="t('settings.automixComponents.label')" width="560px">
     <div class="flex flex-col gap-2.5">
-      <p
-        v-if="
-          models.some((model) => model.downloadAvailable === false && model.state !== 'unsupported')
-        "
-        class="text-xs text-on-surface-variant/70"
-      >
-        {{ t("settings.automixComponents.unpublished") }}
-      </p>
       <SCard v-for="model in models" :key="model.id" variant="settings">
         <div class="flex flex-wrap items-center gap-3">
           <div class="min-w-0 flex-1">
@@ -102,10 +94,7 @@ const cancel = async (): Promise<void> => {
               type="primary"
               size="small"
               :disabled="
-                busy ||
-                !model.downloadAvailable ||
-                model.state === 'ready' ||
-                model.state === 'unsupported'
+                busy || !model.state || model.state === 'ready' || model.state === 'unsupported'
               "
               :loading="pending === model.id"
               @click="install(model.id)"

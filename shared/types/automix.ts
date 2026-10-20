@@ -10,7 +10,6 @@ export interface AutoMixModelStatus {
   state: "missing" | "downloading" | "ready" | "error" | "unsupported";
   received: number;
   total: number;
-  downloadAvailable: boolean;
   error?: string;
   bytesPerSecond?: number;
 }

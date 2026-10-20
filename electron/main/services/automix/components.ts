@@ -20,7 +20,6 @@ const models: AutoMixModelStatus[] = (["beat", "demucs", "runtime"] as const).ma
   state: AUTOMIX_COMPONENTS[id] ? "missing" : "unsupported",
   received: 0,
   total: 0,
-  downloadAvailable: Boolean(AUTOMIX_COMPONENTS[id]?.url),
 }));
 let checking: Promise<AutoMixComponentStatus> | undefined;
 let installation: Promise<AutoMixComponentStatus> | undefined;
@@ -87,7 +86,6 @@ export const installAutoMixComponents = (
     try {
       await getAutoMixComponentStatus();
       if (model.state === "ready") return snapshot();
-      if (!asset.url) throw new Error("AutoMix 组件包暂未发布");
       model.state = "downloading";
       model.received = 0;
       model.total = 0;

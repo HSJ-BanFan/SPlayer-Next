@@ -906,8 +906,7 @@
       "ready": "Installed",
       "unsupported": "Unavailable",
       "missing": "Not installed",
-      "error": "Installation failed",
-      "unpublished": "Components are not published yet"
+      "error": "Installation failed"
     },
     "transitionPreference": {
       "label": "Handoff preference",
