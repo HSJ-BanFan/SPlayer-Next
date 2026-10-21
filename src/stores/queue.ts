@@ -41,6 +41,9 @@ export const allPlayedOnce = computed(
   () => queueEntries.value.length > 0 && queueEntries.value.every((item) => item.playedOnce),
 );
 
+/** 队列结构代次：替换 / 清空 / 恢复时递增，供异步续推丢弃过期结果 */
+export const queueGeneration = ref(0);
+
 /** 心动模式进入前的播放队列快照 */
 export interface PreviousQueueState {
   list: PlaybackQueueItem[];
@@ -89,6 +92,7 @@ export const restorePreviousQueue = async (): Promise<number | null> => {
   queueEntries.value = state.list.map(restoreQueueItem);
   originalQueue.value = null;
   previousQueue.value = null;
+  queueGeneration.value++;
   db.removeItem("previousPlayList").catch(console.error);
   save();
   return Math.max(0, state.index);
@@ -134,6 +138,7 @@ export const restoreQueue = async (): Promise<void> => {
  * @param context - 队列中曲目共用的播放来源上下文
  */
 export const setQueue = (items: readonly Track[], context?: PlaybackContext): void => {
+  queueGeneration.value++;
   queueEntries.value = items.map((track) => createQueueItem(track, context));
   originalQueue.value = null;
   save();
@@ -285,6 +290,7 @@ export const moveInQueue = (fromIndex: number, toIndex: number): void => {
  * 清空队列和洗牌备份
  */
 export const clearQueue = (): void => {
+  queueGeneration.value++;
   queueEntries.value = [];
   originalQueue.value = null;
   save();

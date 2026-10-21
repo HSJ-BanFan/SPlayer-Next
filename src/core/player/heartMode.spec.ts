@@ -42,7 +42,7 @@ vi.mock("localforage", () => ({
   },
 }));
 
-import { queue, queueEntries, setQueue } from "@/stores/queue";
+import { markPlayedOnce, queue, queueEntries, setQueue } from "@/stores/queue";
 import { extendQueue } from "./heartMode";
 
 const track = (id: string): Track => ({
@@ -132,6 +132,18 @@ describe("heartMode", () => {
     await expect(extendQueue(track("a"))).resolves.toBe(0);
 
     expect(api.fetchHeartModeList).not.toHaveBeenCalled();
+  });
+
+  it("请求期间正常切歌不会丢弃续推", async () => {
+    setQueue([track("a"), track("b")]);
+    api.fetchMoreHeartModeSongs.mockImplementation(async () => {
+      markPlayedOnce(0);
+      return { tracks: [track("c")], algMap: {} };
+    });
+
+    await expect(extendQueue(track("b"))).resolves.toBe(1);
+
+    expect(queue.value.map(({ id }) => id)).toEqual(["a", "b", "c"]);
   });
 
   it("请求期间退出心动模式时不追加队列", async () => {

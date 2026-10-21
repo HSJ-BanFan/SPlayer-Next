@@ -928,17 +928,29 @@ const restoreHeartModeModes = (): void => {
 };
 
 /**
- * 进入心动模式：用智能推荐列表替换队列并从头播放
+ * 进入心动模式：种子歌曲置顶，随后接智能推荐列表
  * @param tracks - NCM 智能推荐曲目
+ * @param seedTrack - 进入时的种子歌曲
  */
-export const playHeartMode = async (tracks: readonly Track[]): Promise<void> => {
-  if (tracks.length === 0) return;
+export const playHeartMode = async (
+  tracks: readonly Track[],
+  seedTrack?: Track | null,
+): Promise<void> => {
+  const seed = seedTrack ? { ...seedTrack } : null;
+  if (seed) {
+    // 种子歌曲是进入前的当前曲目，不继承上一轮心动列表里的 AI 标记
+    delete seed.recommended;
+    delete seed.algorithm;
+    delete seed.moreRcmd;
+  }
+  const list = seed ? [seed, ...tracks.filter((track) => track.id !== seed.id)] : [...tracks];
+  if (list.length === 0) return;
   const status = useStatusStore();
   // 保存进入前的队列与播放模式，退出心动模式时恢复
   queue.savePreviousQueue(status.playIndex);
   heartPreviousRepeatMode = status.repeatMode;
   heartPreviousShuffleMode = status.shuffleMode;
-  queue.setQueue(tracks);
+  queue.setQueue(list);
   status.playIndex = 0;
   status.repeatMode = "list";
   status.shuffleMode = "off";
@@ -1007,29 +1019,33 @@ export const nextTrack = async (autoPlay = true): Promise<void> => {
     return;
   }
   if (queue.queueLength.value === 0) return;
-  // 心动模式：标记本轮已播放，整轮听完后再续推
+  // 心动模式：标记本轮已播放，整轮听完后按当前歌曲续推
   if (status.heartMode) queue.markPlayedOnce(status.playIndex);
-  if (
-    status.heartMode &&
-    queue.allPlayedOnce.value &&
-    status.playIndex >= queue.queueLength.value - 1
-  ) {
+  if (status.heartMode && queue.allPlayedOnce.value) {
     const seed = status.currentTrack;
-    const indexBefore = status.playIndex;
-    const lengthBefore = queue.queueLength.value;
-    const entriesBefore = queue.queueEntries.value;
-    if (seed) {
+    const atEnd = status.playIndex >= queue.queueLength.value - 1;
+    if (seed && atEnd) {
+      const indexBefore = status.playIndex;
+      const lengthBefore = queue.queueLength.value;
+      const generationBefore = queue.queueGeneration.value;
       const added = await heartMode.extendQueue(seed);
-      // 续推期间退出心动模式或播放位置被改动，放弃本次续推
-      if (!status.heartMode || status.playIndex !== indexBefore) return;
+      // 续推期间退出心动模式、播放位置变化或队列被替换，放弃本次续推
+      if (
+        !status.heartMode ||
+        status.playIndex !== indexBefore ||
+        queue.queueGeneration.value !== generationBefore
+      ) {
+        return;
+      }
       const lengthAfter = queue.queueLength.value;
       if (added > 0 || lengthAfter > lengthBefore) {
         status.playIndex = lengthBefore;
         await loadTrack(status.currentTrack, status.currentPlaybackContext, autoPlay);
         return;
       }
-      // 队列被替换或清空时不再回绕
-      if (queue.queueEntries.value !== entriesBefore) return;
+    } else if (seed) {
+      // 非队尾：后台续推，避免等到队尾才请求造成停顿
+      void heartMode.extendQueue(seed);
     }
   }
   // 到末尾了

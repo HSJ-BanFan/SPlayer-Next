@@ -2,7 +2,14 @@ import type { Track } from "@shared/types/player";
 import type { CoverItem } from "@/types/artist";
 import type { NeteaseSong, PersonalFmOptions } from "@shared/types/platform/netease";
 import { netease as neteaseApi } from "@/apis/netease";
-import { songsToTracks, withPicSize, toPlaylist, toArtist, toAlbum } from "@/utils/format/netease";
+import {
+  songToTrack,
+  songsToTracks,
+  withPicSize,
+  toPlaylist,
+  toArtist,
+  toAlbum,
+} from "@/utils/format/netease";
 import { playlistToCoverItem, artistToCoverItem, albumToCoverItem } from "@/utils/format/coverItem";
 
 /** 每日推荐歌曲（每日 30 首，需登录） */
@@ -38,7 +45,12 @@ export const fetchHeartModeList = async (
   options?: HeartModeListOptions,
 ): Promise<Track[]> => {
   const body = await neteaseApi.playmode_intelligence<{
-    data?: { songInfo: NeteaseSong; recommended?: boolean; alg?: string }[];
+    data?: {
+      id?: number | string;
+      songInfo: NeteaseSong | null;
+      recommended?: boolean;
+      alg?: string;
+    }[];
   }>({
     id: seedId,
     pid: playlistId,
@@ -49,13 +61,16 @@ export const fetchHeartModeList = async (
     ...(options?.uid !== undefined ? { uid: options.uid } : {}),
   });
   const items = body?.data ?? [];
-  const tracks = songsToTracks(items.map((item) => item.songInfo));
-  items.forEach((item, index) => {
-    const track = tracks[index];
-    if (!track) return;
+  const playlistById = new Map((options?.starPlaylist ?? []).map((track) => [track.id, track]));
+  const tracks: Track[] = [];
+  for (const item of items) {
+    const fallback = playlistById.get(String(item.id));
+    const track = item.songInfo ? songToTrack(item.songInfo) : fallback ? { ...fallback } : null;
+    if (!track) continue;
     if (item.recommended) track.recommended = true;
     if (item.alg) track.algorithm = item.alg;
-  });
+    tracks.push(track);
+  }
   return tracks;
 };
 

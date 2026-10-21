@@ -74,13 +74,13 @@ const fetchMore = (currentTrack: Track, songIds: string[]): Promise<Track[]> => 
  */
 export const extendQueue = async (currentTrack: Track): Promise<number> => {
   const status = useStatusStore();
-  const entriesBefore = queue.queueEntries.value;
+  const generationBefore = queue.queueGeneration.value;
   const songIds = queue.queue.value
     .filter((track) => track.source === "netease" && Boolean(track.id))
     .map((track) => track.id);
   const tracks = await fetchMore(currentTrack, songIds);
-  // 请求期间退出心动模式或队列被替换/改动，放弃本批推荐
-  if (!status.heartMode || queue.queueEntries.value !== entriesBefore) return 0;
+  // 请求期间退出心动模式或队列被整体替换，放弃本批推荐；正常切歌不影响
+  if (!status.heartMode || queue.queueGeneration.value !== generationBefore) return 0;
   if (tracks.length === 0) return 0;
   const seen = new Set(queue.queue.value.map((track) => track.id));
   const fresh = tracks.filter((track) => !seen.has(track.id));

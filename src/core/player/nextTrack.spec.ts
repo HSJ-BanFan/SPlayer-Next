@@ -161,14 +161,33 @@ describe("nextTrack", () => {
     expect(media.track).toBeNull();
   });
 
+  it("整轮听完但不在队尾时后台续推", async () => {
+    const status = useStatusStore();
+    queueStore.setQueue([track("a"), track("b"), track("c")]);
+    queueStore.markPlayedOnce(0);
+    queueStore.markPlayedOnce(1);
+    queueStore.markPlayedOnce(2);
+    status.heartMode = true;
+    status.playIndex = 1;
+    heart.extendQueue.mockResolvedValue(1);
+
+    await nextTrack();
+
+    expect(heart.extendQueue).toHaveBeenCalledWith(expect.objectContaining({ id: "b" }));
+    expect(status.playIndex).toBe(2);
+  });
+
   it("退出心动模式时恢复进入前的队列和播放位置", async () => {
     const status = useStatusStore();
     const media = useMediaStore();
     queueStore.setQueue([track("a"), track("b")]);
     status.playIndex = 1;
 
-    await playHeartMode([track("c")]);
-    expect(queueStore.queue.value.map(({ id }) => id)).toEqual(["c"]);
+    const seed = { ...track("b"), recommended: true, algorithm: "Alg" };
+    await playHeartMode([track("c")], seed);
+    expect(queueStore.queue.value.map(({ id }) => id)).toEqual(["b", "c"]);
+    expect(queueStore.queue.value[0]?.recommended).toBeUndefined();
+    expect(queueStore.queue.value[0]?.algorithm).toBeUndefined();
     expect(status.heartMode).toBe(true);
 
     await exitHeartMode();
