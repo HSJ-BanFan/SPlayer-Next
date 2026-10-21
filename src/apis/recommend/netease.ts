@@ -9,6 +9,7 @@ import {
   toPlaylist,
   toArtist,
   toAlbum,
+  trackToNeteaseSong,
 } from "@/utils/format/netease";
 import { playlistToCoverItem, artistToCoverItem, albumToCoverItem } from "@/utils/format/coverItem";
 
@@ -57,7 +58,9 @@ export const fetchHeartModeList = async (
     ...(options?.type ? { type: options.type } : {}),
     ...(options?.count ? { count: options.count } : {}),
     ...(options?.startMusicId ? { sid: options.startMusicId } : {}),
-    ...(options?.starPlaylist ? { starPlaylist: options.starPlaylist } : {}),
+    ...(options?.starPlaylist
+      ? { starPlaylist: options.starPlaylist.map(trackToNeteaseSong) }
+      : {}),
     ...(options?.uid !== undefined ? { uid: options.uid } : {}),
   });
   const items = body?.data ?? [];
@@ -102,7 +105,6 @@ export const fetchMoreHeartModeSongs = async (
   const tracks = songsToTracks(songList);
   tracks.forEach((track, index) => {
     const alg = algMap[track.id] ?? songList[index]?.alg;
-    track.recommended = true;
     track.moreRcmd = true;
     if (alg) track.algorithm = alg;
   });

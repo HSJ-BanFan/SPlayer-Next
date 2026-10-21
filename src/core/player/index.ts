@@ -909,24 +909,6 @@ export const saveTrackTags = async (edits: TagEditRequest[]): Promise<TagWriteOu
   return result.data;
 };
 
-/** 进入心动模式前的循环/随机模式，退出时恢复 */
-let heartPreviousRepeatMode: RepeatMode | null = null;
-let heartPreviousShuffleMode: ShuffleMode | null = null;
-
-/** 恢复进入心动模式前的播放模式 */
-const restoreHeartModeModes = (): void => {
-  const status = useStatusStore();
-  if (heartPreviousRepeatMode) {
-    status.repeatMode = heartPreviousRepeatMode;
-    heartPreviousRepeatMode = null;
-  }
-  if (heartPreviousShuffleMode) {
-    status.shuffleMode = heartPreviousShuffleMode;
-    heartPreviousShuffleMode = null;
-  }
-  syncPlayMode();
-};
-
 /**
  * 进入心动模式：种子歌曲置顶，随后接智能推荐列表
  * @param tracks - NCM 智能推荐曲目
@@ -946,10 +928,8 @@ export const playHeartMode = async (
   const list = seed ? [seed, ...tracks.filter((track) => track.id !== seed.id)] : [...tracks];
   if (list.length === 0) return;
   const status = useStatusStore();
-  // 保存进入前的队列与播放模式，退出心动模式时恢复
+  // 保存进入前的队列，退出心动模式时恢复
   queue.savePreviousQueue(status.playIndex);
-  heartPreviousRepeatMode = status.repeatMode;
-  heartPreviousShuffleMode = status.shuffleMode;
   queue.setQueue(list);
   status.playIndex = 0;
   status.repeatMode = "list";
@@ -961,16 +941,38 @@ export const playHeartMode = async (
   await loadTrack(status.currentTrack, status.currentPlaybackContext);
 };
 
-/** 退出心动模式，恢复进入前的播放队列与模式 */
+/** 退出心动模式，恢复进入前的播放队列并回到列表循环 */
 export const exitHeartMode = async (): Promise<void> => {
   const status = useStatusStore();
   if (!status.heartMode) return;
   status.heartMode = false;
-  restoreHeartModeModes();
   const index = await queue.restorePreviousQueue();
+  // 与原生一致：退出心动模式固定回到列表循环，而不是进入前的模式
+  status.repeatMode = "list";
+  status.shuffleMode = "off";
+  syncPlayMode();
   if (index === null) return;
   status.playIndex = Math.min(index, Math.max(0, queue.queueLength.value - 1));
   await loadTrack(status.currentTrack, status.currentPlaybackContext);
+};
+
+/**
+ * 设置心动模式是否自动追加「更多推荐」
+ * @param enabled - 是否自动续推
+ */
+export const setHeartModeWantMore = async (enabled: boolean): Promise<void> => {
+  const status = useStatusStore();
+  status.heartModeWantMore = enabled;
+  if (enabled) return;
+  const { index, currentRemoved } = queue.removeMoreRcmdTracks(status.playIndex);
+  status.playIndex = index;
+  if (index === -1) {
+    await stop();
+    return;
+  }
+  if (currentRemoved) {
+    await loadTrack(status.currentTrack, status.currentPlaybackContext);
+  }
 };
 
 /**
@@ -985,11 +987,14 @@ export const playPersonalFm = async (options?: PersonalFmOptions): Promise<boole
   if (!track) return false;
   if (wasHeartMode) {
     status.heartMode = false;
-    restoreHeartModeModes();
     const index = await queue.restorePreviousQueue();
     if (index !== null) {
       status.playIndex = Math.min(index, Math.max(0, queue.queueLength.value - 1));
     }
+    // 与原生一致：离开心动模式后固定回到列表循环
+    status.repeatMode = "list";
+    status.shuffleMode = "off";
+    syncPlayMode();
   }
   status.fmMode = true;
   await loadTrack(track);
@@ -1021,7 +1026,7 @@ export const nextTrack = async (autoPlay = true): Promise<void> => {
   if (queue.queueLength.value === 0) return;
   // 心动模式：标记本轮已播放，整轮听完后按当前歌曲续推
   if (status.heartMode) queue.markPlayedOnce(status.playIndex);
-  if (status.heartMode && queue.allPlayedOnce.value) {
+  if (status.heartMode && status.heartModeWantMore && queue.allPlayedOnce.value) {
     const seed = status.currentTrack;
     const atEnd = status.playIndex >= queue.queueLength.value - 1;
     if (seed && atEnd) {
@@ -1468,6 +1473,10 @@ export const initPlayer = async (): Promise<void> => {
   await useStreamingStore().init();
   await queue.restoreQueue();
   const status = useStatusStore();
+  // 上次关闭了自动续推时，启动即清理已经追加的「更多推荐」曲目
+  if (status.heartMode && !status.heartModeWantMore) {
+    status.playIndex = queue.removeMoreRcmdTracks(status.playIndex).index;
+  }
   stopQueueIndexSync = watch(
     () => status.currentIndex,
     (index) => window.api.player.syncQueueIndex(index),

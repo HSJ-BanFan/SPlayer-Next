@@ -6,11 +6,21 @@ const heart = vi.hoisted(() => ({
   extendQueue: vi.fn(),
 }));
 
-const storage = vi.hoisted(() => ({
-  getItem: vi.fn(() => Promise.resolve(null)),
-  setItem: vi.fn(() => Promise.resolve()),
-  removeItem: vi.fn(() => Promise.resolve()),
-}));
+const storage = vi.hoisted(() => {
+  const values = new Map<string, unknown>();
+  return {
+    values,
+    getItem: vi.fn((key: string) => Promise.resolve(values.get(key) ?? null)),
+    setItem: vi.fn((key: string, value: unknown) => {
+      values.set(key, value);
+      return Promise.resolve();
+    }),
+    removeItem: vi.fn((key: string) => {
+      values.delete(key);
+      return Promise.resolve();
+    }),
+  };
+});
 
 const playerApi = vi.hoisted(() => ({
   load: vi.fn(),
@@ -100,6 +110,7 @@ describe("nextTrack", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     queueStore.queueEntries.value = [];
+    storage.values.clear();
     heart.extendQueue.mockReset();
     playerApi.load.mockReset();
     playerApi.syncPlayMode.mockReset();
@@ -177,11 +188,28 @@ describe("nextTrack", () => {
     expect(status.playIndex).toBe(2);
   });
 
-  it("退出心动模式时恢复进入前的队列和播放位置", async () => {
+  it("关闭自动推荐后不在队尾续推，直接回绕队列", async () => {
+    const status = useStatusStore();
+    queueStore.setQueue([track("a"), track("b")]);
+    queueStore.markPlayedOnce(0);
+    queueStore.markPlayedOnce(1);
+    status.heartMode = true;
+    status.heartModeWantMore = false;
+    status.playIndex = 1;
+
+    await nextTrack();
+
+    expect(heart.extendQueue).not.toHaveBeenCalled();
+    expect(status.playIndex).toBe(0);
+  });
+
+  it("退出心动模式时恢复队列和播放位置，并回到列表循环", async () => {
     const status = useStatusStore();
     const media = useMediaStore();
     queueStore.setQueue([track("a"), track("b")]);
     status.playIndex = 1;
+    status.repeatMode = "one";
+    status.shuffleMode = "on";
 
     const seed = { ...track("b"), recommended: true, algorithm: "Alg" };
     await playHeartMode([track("c")], seed);
@@ -189,12 +217,18 @@ describe("nextTrack", () => {
     expect(queueStore.queue.value[0]?.recommended).toBeUndefined();
     expect(queueStore.queue.value[0]?.algorithm).toBeUndefined();
     expect(status.heartMode).toBe(true);
+    expect(status.repeatMode).toBe("list");
+    expect(status.shuffleMode).toBe("off");
 
+    // 模拟重启：内存快照丢失，只剩持久化副本
+    queueStore.previousQueue.value = null;
     await exitHeartMode();
 
     expect(status.heartMode).toBe(false);
     expect(queueStore.queue.value.map(({ id }) => id)).toEqual(["a", "b"]);
     expect(status.playIndex).toBe(1);
+    expect(status.repeatMode).toBe("list");
+    expect(status.shuffleMode).toBe("off");
     expect(media.track?.id).toBe("b");
   });
 });

@@ -15,6 +15,7 @@ const user = vi.hoisted(() => ({
 
 const status = vi.hoisted(() => ({
   heartMode: true,
+  heartModeWantMore: true,
 }));
 
 const storage = vi.hoisted(() => ({
@@ -61,6 +62,7 @@ describe("heartMode", () => {
     user.likedSongIds = new Set(["a", "b"]);
     user.profile = { userId: 123 };
     status.heartMode = true;
+    status.heartModeWantMore = true;
     api.fetchHeartModeList.mockReset();
     api.fetchMoreHeartModeSongs.mockReset();
   });
@@ -77,9 +79,32 @@ describe("heartMode", () => {
     expect(api.fetchMoreHeartModeSongs).toHaveBeenCalledWith(["a"], "a");
     expect(api.fetchHeartModeList).not.toHaveBeenCalled();
     expect(queue.value.map(({ id }) => id)).toEqual(["a", "b", "c", "d"]);
-    expect(queue.value.find(({ id }) => id === "b")?.recommended).toBe(true);
+    expect(queue.value.find(({ id }) => id === "b")?.recommended).toBeUndefined();
     expect(queue.value.find(({ id }) => id === "b")?.moreRcmd).toBe(true);
     expect(queue.value.find(({ id }) => id === "c")?.algorithm).toBe("Alg_C");
+  });
+
+  it("关闭自动推荐后不发起续推请求", async () => {
+    setQueue([track("a")]);
+    status.heartModeWantMore = false;
+
+    await expect(extendQueue(track("a"))).resolves.toBe(0);
+
+    expect(api.fetchMoreHeartModeSongs).not.toHaveBeenCalled();
+    expect(api.fetchHeartModeList).not.toHaveBeenCalled();
+    expect(queue.value.map(({ id }) => id)).toEqual(["a"]);
+  });
+
+  it("请求期间关闭自动推荐时丢弃本批结果", async () => {
+    setQueue([track("a")]);
+    api.fetchMoreHeartModeSongs.mockImplementation(async () => {
+      status.heartModeWantMore = false;
+      return { tracks: [track("b")], algMap: {} };
+    });
+
+    await expect(extendQueue(track("a"))).resolves.toBe(0);
+
+    expect(queue.value.map(({ id }) => id)).toEqual(["a"]);
   });
 
   it("更多推荐接口失败时退回智能播放列表并携带桌面端参数", async () => {
@@ -100,6 +125,21 @@ describe("heartMode", () => {
       }),
     );
     expect(queue.value.map(({ id }) => id)).toEqual(["a", "b", "c", "d", "e"]);
+  });
+
+  it("回退智能播放列表时跳过仅购买曲目作为起始歌曲", async () => {
+    setQueue([track("a")]);
+    user.likedPlaylistTracks = [{ ...track("locked"), fee: 4 }, track("b")];
+    api.fetchMoreHeartModeSongs.mockRejectedValue(new Error("404"));
+    api.fetchHeartModeList.mockResolvedValue([track("b")]);
+
+    await extendQueue(track("a"));
+
+    expect(api.fetchHeartModeList).toHaveBeenCalledWith(
+      "a",
+      "liked-playlist",
+      expect.objectContaining({ startMusicId: "b" }),
+    );
   });
 
   it("两个接口都失败时返回 0 且不改动队列", async () => {

@@ -3,6 +3,7 @@ import { useUserStore } from "@/stores/user";
 import { useMediaStore } from "@/stores/media";
 import { useStatusStore } from "@/stores/status";
 import { fetchHeartModeList } from "@/apis/recommend/netease";
+import { firstPlayableId } from "@/utils/format/netease";
 import { toast } from "@/composables/useToast";
 import * as player from "@/core/player";
 
@@ -72,7 +73,7 @@ export const useHeartMode = () => {
       const desktopOptions = {
         type: "fromPlayAll" as const,
         count: likedTracks.length,
-        startMusicId: likedTracks[0]?.id ?? seedId,
+        startMusicId: firstPlayableId(likedTracks) ?? seedId,
         starPlaylist: likedTracks,
         uid: user.profile?.userId,
       };

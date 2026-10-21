@@ -230,6 +230,30 @@ export const updateQueueItem = (index: number, track: Track, context?: PlaybackC
 };
 
 /**
+ * 移除所有「更多推荐」续推曲目
+ * @param playIndex - 当前播放位置
+ * @returns 调整后的播放位置、当前曲是否被移除、移除数量
+ */
+export const removeMoreRcmdTracks = (
+  playIndex: number,
+): { index: number; currentRemoved: boolean; removed: number } => {
+  const list = queueEntries.value;
+  const next = list.filter((item) => !item.track.moreRcmd);
+  const removed = list.length - next.length;
+  const currentRemoved =
+    playIndex >= 0 && playIndex < list.length && !!list[playIndex]?.track.moreRcmd;
+  const index = next.length === 0 ? -1 : Math.max(0, Math.min(playIndex, next.length - 1));
+  if (removed === 0) {
+    return { index, currentRemoved, removed };
+  }
+  queueEntries.value = next;
+  originalQueue.value = originalQueue.value?.filter((item) => !item.track.moreRcmd) ?? null;
+  queueGeneration.value++;
+  save();
+  return { index, currentRemoved, removed };
+};
+
+/**
  * 移除指定服务器的全部流媒体歌曲
  * @param serverId - 服务器 ID
  */

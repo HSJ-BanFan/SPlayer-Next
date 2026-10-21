@@ -7,6 +7,7 @@
 
 import type { Track } from "@shared/types/player";
 import { fetchHeartModeList, fetchMoreHeartModeSongs } from "@/apis/recommend/netease";
+import { firstPlayableId } from "@/utils/format/netease";
 import * as queue from "@/stores/queue";
 import { useStatusStore } from "@/stores/status";
 import { useUserStore } from "@/stores/user";
@@ -35,7 +36,6 @@ const fetchMore = (currentTrack: Track, songIds: string[]): Promise<Track[]> => 
         if (tracks.length > 0) {
           return tracks.slice(0, MORE_RCMD_BATCH_SIZE).map((track) => ({
             ...track,
-            recommended: true,
             moreRcmd: true,
             ...(algMap[track.id] ? { algorithm: algMap[track.id] } : {}),
           }));
@@ -50,7 +50,7 @@ const fetchMore = (currentTrack: Track, songIds: string[]): Promise<Track[]> => 
     const tracks = await fetchHeartModeList(currentTrack.id, playlistId, {
       type: "fromPlayAll",
       count: Math.max(liked.length, user.likedSongIds.size, 1),
-      startMusicId: liked[0]?.id ?? currentTrack.id,
+      startMusicId: firstPlayableId(liked) ?? currentTrack.id,
       starPlaylist: liked,
       uid: user.profile?.userId,
     });
@@ -74,13 +74,20 @@ const fetchMore = (currentTrack: Track, songIds: string[]): Promise<Track[]> => 
  */
 export const extendQueue = async (currentTrack: Track): Promise<number> => {
   const status = useStatusStore();
+  if (!status.heartMode || !status.heartModeWantMore) return 0;
   const generationBefore = queue.queueGeneration.value;
   const songIds = queue.queue.value
     .filter((track) => track.source === "netease" && Boolean(track.id))
     .map((track) => track.id);
   const tracks = await fetchMore(currentTrack, songIds);
-  // 请求期间退出心动模式或队列被整体替换，放弃本批推荐；正常切歌不影响
-  if (!status.heartMode || queue.queueGeneration.value !== generationBefore) return 0;
+  // 请求期间关闭自动续推、退出心动模式或队列被整体替换，放弃本批推荐；正常切歌不影响
+  if (
+    !status.heartMode ||
+    !status.heartModeWantMore ||
+    queue.queueGeneration.value !== generationBefore
+  ) {
+    return 0;
+  }
   if (tracks.length === 0) return 0;
   const seen = new Set(queue.queue.value.map((track) => track.id));
   const fresh = tracks.filter((track) => !seen.has(track.id));
