@@ -121,7 +121,22 @@ const onClear = (): void => {
             >
               <SImg :src="item.cover" class="size-9 rounded shrink-0" />
               <div class="flex-1 min-w-0">
-                <div class="text-xs truncate font-medium leading-tight">{{ item.title }}</div>
+                <div class="text-xs font-medium leading-tight flex items-center gap-1">
+                  <span class="truncate">{{ item.title }}</span>
+                  <span
+                    v-if="item.moreRcmd || item.recommended"
+                    class="shrink-0 rounded px-1 text-[9px] leading-4"
+                    :class="
+                      item.moreRcmd
+                        ? 'bg-primary/15 text-primary'
+                        : 'bg-on-surface/10 text-on-surface-variant'
+                    "
+                  >
+                    {{
+                      item.moreRcmd ? t("player.heartMode.moreRcmd") : t("player.heartMode.aiRcmd")
+                    }}
+                  </span>
+                </div>
                 <div
                   class="text-[11px] truncate leading-tight mt-0.5"
                   :class="

@@ -36,6 +36,77 @@ export const originalQueue = shallowRef<PlaybackQueueItem[] | null>(null);
 /** 队列中的歌曲总数 */
 export const queueLength = computed(() => queue.value.length);
 
+/** 心动模式：当前队列是否每首都已播放过至少一次 */
+export const allPlayedOnce = computed(
+  () => queueEntries.value.length > 0 && queueEntries.value.every((item) => item.playedOnce),
+);
+
+/** 心动模式进入前的播放队列快照 */
+export interface PreviousQueueState {
+  list: PlaybackQueueItem[];
+  index: number;
+}
+
+/** 内存中的心动模式原队列，持久化副本用于跨重启恢复 */
+export const previousQueue = shallowRef<PreviousQueueState | null>(null);
+
+/**
+ * 保存心动模式进入前的播放队列
+ * @param playIndex - 进入前的播放位置
+ */
+export const savePreviousQueue = (playIndex: number): void => {
+  if (queueEntries.value.length === 0) return;
+  const state: PreviousQueueState = {
+    list: queueEntries.value.map((item) => ({ ...item })),
+    index: Math.max(0, playIndex),
+  };
+  previousQueue.value = state;
+  db.setItem("previousPlayList", toRaw(state)).catch(console.error);
+};
+
+/**
+ * 恢复心动模式进入前的播放队列
+ * @returns 进入前的播放位置；没有快照时返回 null
+ */
+export const restorePreviousQueue = async (): Promise<number | null> => {
+  let state = previousQueue.value;
+  if (!state?.list?.length) {
+    try {
+      const stored = await db.getItem<{ list?: PersistedQueueItem[]; index?: number }>(
+        "previousPlayList",
+      );
+      if (stored?.list?.length) {
+        state = {
+          list: stored.list.map(restoreQueueItem),
+          index: stored.index ?? 0,
+        };
+      }
+    } catch (error) {
+      console.error("[queue] 恢复心动模式原队列失败:", error);
+    }
+  }
+  if (!state?.list?.length) return null;
+  queueEntries.value = state.list.map(restoreQueueItem);
+  originalQueue.value = null;
+  previousQueue.value = null;
+  db.removeItem("previousPlayList").catch(console.error);
+  save();
+  return Math.max(0, state.index);
+};
+
+/**
+ * 标记队列项已播放过至少一次
+ * @param index - 队列位置
+ */
+export const markPlayedOnce = (index: number): void => {
+  const item = queueEntries.value[index];
+  if (!item || item.playedOnce) return;
+  const next = [...queueEntries.value];
+  next[index] = { ...item, playedOnce: true };
+  queueEntries.value = next;
+  save();
+};
+
 /** 保存当前播放列表数据 */
 const save = (): void => {
   db.setItem("playList", toRaw(queueEntries.value)).catch(console.error);

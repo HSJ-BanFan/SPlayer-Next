@@ -43,18 +43,40 @@ export const useHeartMode = () => {
       toast.warning(t("player.heartMode.noSeed"));
       return;
     }
+    const likedTracks = user.likedPlaylistTracks;
+    const count = Math.max(likedTracks.length, user.likedSongIds.size, 1);
+    const desktopOptions = {
+      type: "fromPlayAll" as const,
+      count,
+      startMusicId: likedTracks[0]?.id ?? seedId,
+      starPlaylist: likedTracks,
+      uid: user.profile?.userId,
+    };
     const loading = toast.loading(t("player.heartMode.loading"), { duration: 0 });
     try {
-      const tracks = await fetchHeartModeList(seedId, playlistId);
+      let tracks: Track[] = [];
+      if (likedTracks.length > 0) {
+        try {
+          tracks = await fetchHeartModeList(seedId, playlistId, desktopOptions);
+        } catch (error) {
+          console.warn("[heartMode] 桌面端参数请求失败，回退基础参数:", error);
+        }
+      }
+      // 桌面端参数不兼容或歌单尚未加载时，退回已验证的基础请求
       if (tracks.length === 0) {
-        toast.warning(t("player.heartMode.failed"));
+        tracks = await fetchHeartModeList(seedId, playlistId);
+      }
+      if (tracks.length === 0) {
+        status.repeatMode = "list";
+        toast.warning(t("player.heartMode.failedFallback"));
         return;
       }
       await player.playHeartMode(tracks);
       toast.success(t("player.heartMode.entered"));
     } catch (error) {
       console.error("[heartMode] 进入失败:", error);
-      toast.warning(t("player.heartMode.failed"));
+      status.repeatMode = "list";
+      toast.warning(t("player.heartMode.failedFallback"));
     } finally {
       loading.close();
     }

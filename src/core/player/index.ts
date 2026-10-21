@@ -909,6 +909,24 @@ export const saveTrackTags = async (edits: TagEditRequest[]): Promise<TagWriteOu
   return result.data;
 };
 
+/** 进入心动模式前的循环/随机模式，退出时恢复 */
+let heartPreviousRepeatMode: RepeatMode | null = null;
+let heartPreviousShuffleMode: ShuffleMode | null = null;
+
+/** 恢复进入心动模式前的播放模式 */
+const restoreHeartModeModes = (): void => {
+  const status = useStatusStore();
+  if (heartPreviousRepeatMode) {
+    status.repeatMode = heartPreviousRepeatMode;
+    heartPreviousRepeatMode = null;
+  }
+  if (heartPreviousShuffleMode) {
+    status.shuffleMode = heartPreviousShuffleMode;
+    heartPreviousShuffleMode = null;
+  }
+  syncPlayMode();
+};
+
 /**
  * 进入心动模式：用智能推荐列表替换队列并从头播放
  * @param tracks - NCM 智能推荐曲目
@@ -916,8 +934,13 @@ export const saveTrackTags = async (edits: TagEditRequest[]): Promise<TagWriteOu
 export const playHeartMode = async (tracks: readonly Track[]): Promise<void> => {
   if (tracks.length === 0) return;
   const status = useStatusStore();
+  // 保存进入前的队列与播放模式，退出心动模式时恢复
+  queue.savePreviousQueue(status.playIndex);
+  heartPreviousRepeatMode = status.repeatMode;
+  heartPreviousShuffleMode = status.shuffleMode;
   queue.setQueue(tracks);
   status.playIndex = 0;
+  status.repeatMode = "list";
   status.shuffleMode = "off";
   status.heartMode = true;
   // 心动 / FM 互斥
@@ -926,9 +949,16 @@ export const playHeartMode = async (tracks: readonly Track[]): Promise<void> => 
   await loadTrack(status.currentTrack, status.currentPlaybackContext);
 };
 
-/** 退出心动模式，保留当前队列继续播放 */
-export const exitHeartMode = (): void => {
-  useStatusStore().heartMode = false;
+/** 退出心动模式，恢复进入前的播放队列与模式 */
+export const exitHeartMode = async (): Promise<void> => {
+  const status = useStatusStore();
+  if (!status.heartMode) return;
+  status.heartMode = false;
+  restoreHeartModeModes();
+  const index = await queue.restorePreviousQueue();
+  if (index === null) return;
+  status.playIndex = Math.min(index, Math.max(0, queue.queueLength.value - 1));
+  await loadTrack(status.currentTrack, status.currentPlaybackContext);
 };
 
 /**
@@ -938,11 +968,18 @@ export const exitHeartMode = (): void => {
  */
 export const playPersonalFm = async (options?: PersonalFmOptions): Promise<boolean> => {
   const status = useStatusStore();
+  const wasHeartMode = status.heartMode;
   const track = await fm.start(options);
   if (!track) return false;
+  if (wasHeartMode) {
+    status.heartMode = false;
+    restoreHeartModeModes();
+    const index = await queue.restorePreviousQueue();
+    if (index !== null) {
+      status.playIndex = Math.min(index, Math.max(0, queue.queueLength.value - 1));
+    }
+  }
   status.fmMode = true;
-  // 心动 / FM 互斥
-  status.heartMode = false;
   await loadTrack(track);
   return true;
 };
@@ -970,26 +1007,29 @@ export const nextTrack = async (autoPlay = true): Promise<void> => {
     return;
   }
   if (queue.queueLength.value === 0) return;
-  // 心动模式：队列耗尽时按当前歌曲续推，避免从头循环同一批
-  if (status.heartMode && status.playIndex >= queue.queueLength.value - 1) {
+  // 心动模式：标记本轮已播放，整轮听完后再续推
+  if (status.heartMode) queue.markPlayedOnce(status.playIndex);
+  if (
+    status.heartMode &&
+    queue.allPlayedOnce.value &&
+    status.playIndex >= queue.queueLength.value - 1
+  ) {
     const seed = status.currentTrack;
     const indexBefore = status.playIndex;
     const lengthBefore = queue.queueLength.value;
+    const entriesBefore = queue.queueEntries.value;
     if (seed) {
-      const added = await heartMode.extendQueue(seed.id);
-      // 续推期间队列或播放位置被改动，放弃本次续推
-      if (
-        !status.heartMode ||
-        status.playIndex !== indexBefore ||
-        queue.queueLength.value !== lengthBefore + added
-      ) {
-        return;
-      }
-      if (added > 0) {
+      const added = await heartMode.extendQueue(seed);
+      // 续推期间退出心动模式或播放位置被改动，放弃本次续推
+      if (!status.heartMode || status.playIndex !== indexBefore) return;
+      const lengthAfter = queue.queueLength.value;
+      if (added > 0 || lengthAfter > lengthBefore) {
         status.playIndex = lengthBefore;
         await loadTrack(status.currentTrack, status.currentPlaybackContext, autoPlay);
         return;
       }
+      // 队列被替换或清空时不再回绕
+      if (queue.queueEntries.value !== entriesBefore) return;
     }
   }
   // 到末尾了
@@ -1123,6 +1163,7 @@ export const playAtIndex = async (index: number): Promise<void> => {
   }
   // 退出 FM
   status.fmMode = false;
+  if (status.heartMode) queue.markPlayedOnce(status.playIndex);
   status.playIndex = index;
   await loadTrack(status.currentTrack, status.currentPlaybackContext);
 };

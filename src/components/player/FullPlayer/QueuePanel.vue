@@ -96,7 +96,18 @@ const {
               />
               <SImg :src="item.cover" class="size-12 rounded-lg shrink-0" />
               <div class="flex-1 min-w-0">
-                <div class="text-base truncate font-medium leading-snug">{{ item.title }}</div>
+                <div class="text-base font-medium leading-snug flex items-center gap-1.5">
+                  <span class="truncate">{{ item.title }}</span>
+                  <span
+                    v-if="item.moreRcmd || item.recommended"
+                    class="shrink-0 rounded px-1 text-[10px] leading-4"
+                    :class="item.moreRcmd ? 'bg-cover/20 text-cover' : 'bg-cover/12 text-cover/70'"
+                  >
+                    {{
+                      item.moreRcmd ? t("player.heartMode.moreRcmd") : t("player.heartMode.aiRcmd")
+                    }}
+                  </span>
+                </div>
                 <div
                   class="text-sm truncate leading-snug mt-0.5"
                   :class="index === statusStore.playIndex ? 'text-cover/70' : 'text-cover/55'"

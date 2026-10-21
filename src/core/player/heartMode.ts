@@ -1,26 +1,61 @@
 /**
  * 心动模式续推
+ *
+ * 与桌面端对齐：一轮队列每首至少播放一次后，先调用「更多推荐」接口取 3 首；
+ * 接口不可用时退回心动模式智能播放列表。
  */
 
 import type { Track } from "@shared/types/player";
-import { fetchHeartModeList } from "@/apis/recommend/netease";
+import { fetchHeartModeList, fetchMoreHeartModeSongs } from "@/apis/recommend/netease";
 import * as queue from "@/stores/queue";
 import { useStatusStore } from "@/stores/status";
 import { useUserStore } from "@/stores/user";
+
+/** 原生桌面端「更多推荐」每次追加的数量 */
+const MORE_RCMD_BATCH_SIZE = 3;
+/** 退回智能播放列表时最多追加的数量，避免一次灌入过多重复曲目 */
+const FALLBACK_BATCH_SIZE = 10;
 
 /** 续推在途 promise，并发复用 */
 let fetchingPromise: Promise<Track[]> | null = null;
 
 /**
- * 以指定歌曲为种子拉取下一批心动模式曲目
- * @param seedId - 种子歌曲 id
+ * 按当前歌曲续推一批曲目
+ * @param currentTrack - 当前播放歌曲
+ * @param songIds - 当前队列中的歌曲 id
  * @returns 推荐曲目；接口失败或未登录时为空数组
  */
-const fetchMore = (seedId: string): Promise<Track[]> => {
+const fetchMore = (currentTrack: Track, songIds: string[]): Promise<Track[]> => {
   if (fetchingPromise) return fetchingPromise;
-  const playlistId = useUserStore().likedPlaylistId;
-  if (!playlistId) return Promise.resolve([]);
-  const request = fetchHeartModeList(seedId, playlistId)
+  const user = useUserStore();
+  const request = (async () => {
+    if (songIds.length > 0) {
+      try {
+        const { tracks, algMap } = await fetchMoreHeartModeSongs(songIds, currentTrack.id);
+        if (tracks.length > 0) {
+          return tracks.slice(0, MORE_RCMD_BATCH_SIZE).map((track) => ({
+            ...track,
+            recommended: true,
+            moreRcmd: true,
+            ...(algMap[track.id] ? { algorithm: algMap[track.id] } : {}),
+          }));
+        }
+      } catch (error) {
+        console.warn("[heartMode] 更多推荐接口不可用，回退智能播放列表:", error);
+      }
+    }
+    const playlistId = user.likedPlaylistId;
+    if (!playlistId) return [];
+    const liked = user.likedPlaylistTracks;
+    const tracks = await fetchHeartModeList(currentTrack.id, playlistId, {
+      type: "fromPlayAll",
+      count: Math.max(liked.length, user.likedSongIds.size, 1),
+      startMusicId: liked[0]?.id ?? currentTrack.id,
+      starPlaylist: liked,
+      uid: user.profile?.userId,
+    });
+    return tracks.slice(0, FALLBACK_BATCH_SIZE);
+  })()
     .catch((error) => {
       console.error("[heartMode] 续推失败:", error);
       return [];
@@ -34,13 +69,16 @@ const fetchMore = (seedId: string): Promise<Track[]> => {
 
 /**
  * 按当前歌曲续推一批曲目并追加到队列末尾
- * @param seedId - 种子歌曲 id
+ * @param currentTrack - 当前播放歌曲
  * @returns 实际追加的曲目数
  */
-export const extendQueue = async (seedId: string): Promise<number> => {
+export const extendQueue = async (currentTrack: Track): Promise<number> => {
   const status = useStatusStore();
   const entriesBefore = queue.queueEntries.value;
-  const tracks = await fetchMore(seedId);
+  const songIds = queue.queue.value
+    .filter((track) => track.source === "netease" && Boolean(track.id))
+    .map((track) => track.id);
+  const tracks = await fetchMore(currentTrack, songIds);
   // 请求期间退出心动模式或队列被替换/改动，放弃本批推荐
   if (!status.heartMode || queue.queueEntries.value !== entriesBefore) return 0;
   if (tracks.length === 0) return 0;
