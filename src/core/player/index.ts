@@ -12,6 +12,7 @@ import { useHistoryStore } from "@/stores/history";
 import { useLibraryStore } from "@/stores/library";
 import * as queue from "@/stores/queue";
 import * as fm from "./fm";
+import * as heartMode from "./heartMode";
 import * as playback from "@/services/playback";
 import * as lyricLoader from "@/services/lyric/loader";
 import * as coverLoader from "@/services/coverLoader";
@@ -751,6 +752,28 @@ export const nextTrack = async (): Promise<void> => {
     return;
   }
   if (queue.queueLength.value === 0) return;
+  // 心动模式：队列耗尽时按当前歌曲续推，避免从头循环同一批
+  if (status.heartMode && status.playIndex >= queue.queueLength.value - 1) {
+    const seed = status.currentTrack;
+    const indexBefore = status.playIndex;
+    const lengthBefore = queue.queueLength.value;
+    if (seed) {
+      const added = await heartMode.extendQueue(seed.id);
+      // 续推期间队列或播放位置被改动，放弃本次续推
+      if (
+        !status.heartMode ||
+        status.playIndex !== indexBefore ||
+        queue.queueLength.value !== lengthBefore + added
+      ) {
+        return;
+      }
+      if (added > 0) {
+        status.playIndex = lengthBefore;
+        await loadTrack(status.currentTrack, status.currentPlaybackContext);
+        return;
+      }
+    }
+  }
   // 到末尾了
   if (status.playIndex >= queue.queueLength.value - 1) {
     if (status.shuffleMode === "on" && queue.queueLength.value > 1) {
