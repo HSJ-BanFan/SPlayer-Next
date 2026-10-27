@@ -33,7 +33,7 @@ export default defineConfig({
   main: {
     publicDir: resolve(__dirname, "public"),
     build: {
-      rollupOptions: {
+      rolldownOptions: {
         input: {
           index: resolve(__dirname, "electron/main/index.ts"),
           // 插件 host worker
@@ -61,7 +61,7 @@ export default defineConfig({
   },
   preload: {
     build: {
-      rollupOptions: {
+      rolldownOptions: {
         input: {
           index: resolve(__dirname, "electron/preload/index.ts"),
         },
@@ -94,7 +94,7 @@ export default defineConfig({
     },
     publicDir: resolve(__dirname, "public"),
     build: {
-      rollupOptions: {
+      rolldownOptions: {
         input: {
           index: resolve(__dirname, "index.html"),
           "desktop-lyric": resolve(__dirname, "windows/desktop-lyric/index.html"),

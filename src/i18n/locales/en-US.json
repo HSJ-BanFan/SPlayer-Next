@@ -766,6 +766,7 @@
       "update": "Update",
       "language": "Language",
       "playControl": "Playback Control",
+      "playBehavior": "Playback Behavior",
       "playbackTransition": "Playback Transition",
       "audioSource": "Audio Source",
       "scrobble": "Scrobble",
@@ -871,10 +872,16 @@
       "description": "Restore playback position on startup"
     },
     "searchPlayBehavior": {
-      "label": "Search Playback Behavior",
-      "description": "Playback strategy when double-clicking a track on the search page",
+      "label": "Search Playback",
+      "description": "Configure what double-clicking a track on the search page does",
       "current": "Play Current Track Only",
       "all": "Play All Results"
+    },
+    "songListPlayBehavior": {
+      "label": "Song Play Button Behavior",
+      "description": "Configure the play button at the start of each song row",
+      "current": "Play Current Track Only",
+      "all": "Play Whole List"
     },
     "showLyricInBar": {
       "label": "Show Lyric While Playing",
@@ -1138,7 +1145,9 @@
       "exclusiveModeTitle": "Switch to Exclusive Mode",
       "exclusiveModeContent": "Exclusive mode bypasses the system mixer and prefers the source sample rate and bit depth, making it suitable for external DACs / Hi-Fi gear. Player volume, EQ and other processing still apply, so bit-perfect output is not guaranteed. Other apps may be unable to play audio while exclusive. If exclusive mode is unavailable, shared mode will be attempted; it may also fail if another app holds the device exclusively. Switch anyway?",
       "preloadCacheTitle": "Enable the caches required for preloading?",
-      "preloadCacheContent": "Preloading requires caching the next track's audio. Continuing will enable both song caching and streaming caching, which may increase network traffic and disk usage"
+      "preloadCacheContent": "Preloading requires caching the next track's audio. Continuing will enable both song caching and streaming caching, which may increase network traffic and disk usage",
+      "disableSongCacheTitle": "Disable Song Cache?",
+      "disableSongCacheContent": "Preloading and crossfade depend on the song cache and will be disabled as well"
     },
     "useAMSpring": {
       "label": "Spring Animation Debug Switch",
@@ -1633,6 +1642,12 @@
       "default": "Classic",
       "sidebarFull": "Immersive Sidebar",
       "floating": "Dynamic Floating"
+    },
+    "songListStyle": {
+      "label": "Song List Style",
+      "description": "Display density of song lists",
+      "comfortable": "Comfortable",
+      "compact": "Compact"
     },
     "routeTransition": {
       "label": "Page Transition",
